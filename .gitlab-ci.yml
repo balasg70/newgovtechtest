@@ -1,0 +1,79 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+  AWS_S3_URL: $AWS_S3_URL
+  
+build:
+  stage: build
+  image: hashicorp/terraform:light
+  
+  script:
+    - echo $AWS_ACCESS_KEY_ID_DEV
+    - echo $AWS_SECRET_ACCESS_KEY_DEV
+    - echo $AWS_S3_URL_DEV
+    - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID_DEV
+    - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY_DEV
+    - cd scenario1/
+    - terraform init
+    - terraform validate
+    - terraform plan $TF_CLI_ARGS_PLAN -out=tfplan
+    - cd scenario2/
+    - terraform init
+    - terraform validate
+    - terraform plan $TF_CLI_ARGS_PLAN -out=tfplan
+
+  script:
+       # We simulate a build phase by manually creating files in a build folder
+       # An example would be using `yarn build` to build a react project 
+       # that would create static files in a build or public folder
+    - mkdir -p build && touch build/index.html build/CSS build/countapp.js
+  artifacts:
+    when: on_success
+    paths:
+      - build/
+    expire_in: 20 mins
+
+
+deploy:
+  stage: deploy
+  image: hashicorp/terraform:light
+  script:
+    - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+    - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+    - cd scenario1
+    - terraform apply $TF_CLI_ARGS_APPLY tfplan
+    - cd scenario2
+    - terraform apply 
+  environment:
+    name: testing
+  when: manual
+
+  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+  script:
+    - echo "Running deploy"
+    - aws s3 cp ./build s3://$S3_BUCKET/ --recursive
+    - echo "Deployment successful"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
